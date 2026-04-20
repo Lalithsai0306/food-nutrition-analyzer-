@@ -143,7 +143,8 @@ def run_pipeline(file_bytes):
     df["calorie_group"] = df["Calories"].apply(calorie_group)
 
     drop_cols_for_ml = []
-    for c in ["Food", "Measure"]:
+    # MODIFICATION 1: Removed "Measure" from this list so models can use it
+    for c in ["Food"]: 
         if c in df.columns:
             drop_cols_for_ml.append(c)
 
@@ -534,7 +535,10 @@ def render_eval_visualizations(ctx):
 def render_predictions(ctx):
     st.subheader("Predictions")
     st.write("Enter input values manually (no default values).")
-    fields = [c for c in ["Category", "Grams", "Protein", "Fat", "Sat.Fat", "Fiber", "Carbs"] if c in ctx["raw_df"].columns or c == "Category"]
+    
+    # MODIFICATION 2: Added "Measure" right after "Category"
+    fields = [c for c in ["Category", "Measure", "Grams", "Protein", "Fat", "Sat.Fat", "Fiber", "Carbs"] if c in ctx["raw_df"].columns or c in ["Category", "Measure"]]
+    
     user_input = {}
     with st.form("nutrition_prediction_form"):
         cols = st.columns(2)
