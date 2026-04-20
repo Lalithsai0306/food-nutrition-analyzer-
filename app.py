@@ -108,7 +108,7 @@ def run_pipeline(file_bytes):
     missing_report = pd.DataFrame({"missing_count": missing_count, "missing_pct": missing_pct})
     missing_nonzero = missing_pct[missing_pct > 0]
 
-    # FIX 1: Safely handle missing values by explicitly checking for numeric types
+    # Safely handle missing values by explicitly checking for numeric types
     for col in df.columns:
         if pd.api.types.is_numeric_dtype(df[col]):
             df[col] = df[col].fillna(df[col].median())
@@ -151,7 +151,7 @@ def run_pipeline(file_bytes):
 
     X_raw = df.drop(columns=["Calories", "calorie_group"] + drop_cols_for_ml).copy()
     
-    # FIX 2: Safely grab categorical columns by excluding numbers
+    # Safely grab categorical columns by excluding numbers
     cat_cols = X_raw.select_dtypes(exclude=[np.number]).columns.tolist()
 
     low_card = []
@@ -186,7 +186,6 @@ def run_pipeline(file_bytes):
 
     models = {}
     models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=400, random_state=42, n_jobs=-1, class_weight="balanced"))
-    # FIXED: Removed multi_class="ovr"
     models["Logistic Regression"] = ("scaled", LogisticRegression(max_iter=4000, class_weight="balanced"))
     models["Support Vector Machine"] = ("scaled", SVC(kernel="rbf", C=2.0, gamma="scale", probability=True, class_weight="balanced"))
     models["XGBoost"] = ("raw", XGBClassifier(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42, eval_metric="mlogloss"))
@@ -330,7 +329,7 @@ def prepare_one_row(input_dict, ctx):
         if c in one.columns:
             one[c] = pd.to_numeric(one[c], errors="coerce")
 
-    # FIX 3: Safely handle missing values in individual prediction rows
+    # Safely handle missing values in individual prediction rows
     for col in one.columns:
         if pd.api.types.is_numeric_dtype(one[col]):
             one[col] = one[col].fillna(0)
@@ -613,10 +612,23 @@ with st.sidebar:
     st.markdown("---")
     module = st.radio("Modules", ["Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"])
 
+# ==========================================
+# THE MAGIC: st.session_state optimization
+# ==========================================
+
 if uploaded_file is None:
     st.info("Upload `nutrients_data.csv` from the left sidebar to continue.")
     st.stop()
 
+# 1. Create a unique ID for the file to detect if the user uploads a new one
+file_id = uploaded_file.name + str(uploaded_file.size)
+
+# 2. If it's a new file, clear the old memory
+if "file_id" not in st.session_state or st.session_state.file_id != file_id:
+    st.session_state.file_id = file_id
+    st.session_state.ctx = None 
+
+# 3. Read the basic preview dataframe
 try:
     file_bytes = uploaded_file.getvalue()
     preview_df = pd.read_csv(io.BytesIO(file_bytes))
@@ -626,12 +638,19 @@ except Exception as ex:
 
 render_data_info(preview_df)
 
-try:
-    ctx = run_pipeline(file_bytes)
-except Exception as ex:
-    st.error(f"Pipeline failed: {ex}")
-    st.stop()
+# 4. Only run the heavy ML pipeline if it's not already in memory
+if st.session_state.ctx is None:
+    with st.spinner("⚙️ Crunching data & training XGBoost/RF Models... (This takes a few seconds, but only runs ONCE!)"):
+        try:
+            st.session_state.ctx = run_pipeline(file_bytes)
+        except Exception as ex:
+            st.error(f"Pipeline failed: {ex}")
+            st.stop()
 
+# 5. Instantly load the context from server RAM
+ctx = st.session_state.ctx
+
+# 6. Render the selected module
 if module == "Pre-processing":
     render_preprocessing(ctx)
 elif module == "EDA":
