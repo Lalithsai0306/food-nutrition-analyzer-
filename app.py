@@ -1,28 +1,6 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-# (Keep the rest of your imports here...)
-
-# 1. Page Title
-st.title("Food Nutrition Analysis & Prediction System")
-
-# 2. Load the Data FIRST
-csv_file = "nutrients_data.csv"
-df = pd.read_csv("nutrients_data.csv")
-
-# Clean column names just like in your original script
-df.columns = [c.strip() for c in df.columns]
-
-# 3. NOW you can display it!
-st.subheader("Dataset Overview")
-st.dataframe(df.head()) 
-
 # ============================================================
 # Food Nutrition: Analysis and Visualization
 # Streamlit Version (same logic, modular UI)
-# Dataset: nutrients_data.csv
 # ============================================================
 
 import warnings
@@ -40,7 +18,8 @@ from sklearn.preprocessing import StandardScaler, label_binarize
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     classification_report, confusion_matrix,
-    roc_auc_score, roc_curve
+    roc_auc_score, roc_curve,
+    mean_absolute_error, mean_squared_error, r2_score
 )
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -49,217 +28,66 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from xgboost import XGBClassifier, XGBRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
 
 st.set_page_config(page_title="Food Nutrition: Analysis and Visualization", layout="wide")
 
 # ============================================================
-# Light Contrast Styling — injected CSS only, no logic changes
+# Light Contrast Styling
 # ============================================================
 st.markdown("""
 <style>
 /* ── Page background ─────────────────────────────────────── */
-[data-testid="stAppViewContainer"] {
-    background-color: #f5f7fa;
-}
-
-[data-testid="stHeader"] {
-    background-color: #f5f7fa;
-    border-bottom: 1px solid #dde3ec;
-}
-
+[data-testid="stAppViewContainer"] { background-color: #f5f7fa; }
+[data-testid="stHeader"] { background-color: #f5f7fa; border-bottom: 1px solid #dde3ec; }
 /* ── Sidebar ─────────────────────────────────────────────── */
-[data-testid="stSidebar"] {
-    background-color: #eef1f7;
-    border-right: 1px solid #d4daea;
-}
-
-[data-testid="stSidebar"] .stRadio label {
-    color: #2d3a4a;
-    font-weight: 500;
-}
-
-[data-testid="stSidebar"] hr {
-    border-color: #c8d0df;
-}
-
+[data-testid="stSidebar"] { background-color: #eef1f7; border-right: 1px solid #d4daea; }
+[data-testid="stSidebar"] .stRadio label { color: #2d3a4a; font-weight: 500; }
+[data-testid="stSidebar"] hr { border-color: #c8d0df; }
 /* ── Main title & caption ────────────────────────────────── */
-h1 {
-    color: #1a2a3a !important;
-    letter-spacing: -0.5px;
-    border-bottom: 2px solid #c5d0e0;
-    padding-bottom: 0.4rem;
-    margin-bottom: 0.5rem;
-}
-
-[data-testid="stCaptionContainer"] p {
-    color: #5a6a7e !important;
-    font-size: 0.88rem;
-}
-
+h1 { color: #1a2a3a !important; letter-spacing: -0.5px; border-bottom: 2px solid #c5d0e0; padding-bottom: 0.4rem; margin-bottom: 0.5rem; }
+[data-testid="stCaptionContainer"] p { color: #5a6a7e !important; font-size: 0.88rem; }
 /* ── Section subheaders ──────────────────────────────────── */
-h2, h3 {
-    color: #243447 !important;
-    border-left: 4px solid #6b93c4;
-    padding-left: 10px;
-    margin-top: 1.4rem !important;
-}
-
-h4 {
-    color: #344a60 !important;
-}
-
+h2, h3 { color: #243447 !important; border-left: 4px solid #6b93c4; padding-left: 10px; margin-top: 1.4rem !important; }
+h4 { color: #344a60 !important; }
 /* ── Metric cards ────────────────────────────────────────── */
-[data-testid="stMetric"] {
-    background: #ffffff;
-    border: 1px solid #d0daea;
-    border-radius: 10px;
-    padding: 14px 18px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-
-[data-testid="stMetricLabel"] {
-    color: #5a6a7e !important;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-[data-testid="stMetricValue"] {
-    color: #1a2a3a !important;
-    font-weight: 700;
-}
-
+[data-testid="stMetric"] { background: #ffffff; border: 1px solid #d0daea; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+[data-testid="stMetricLabel"] { color: #5a6a7e !important; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+[data-testid="stMetricValue"] { color: #1a2a3a !important; font-weight: 700; }
 /* ── Dataframes / tables ─────────────────────────────────── */
-[data-testid="stDataFrame"] {
-    border: 1px solid #d4daea;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
+[data-testid="stDataFrame"] { border: 1px solid #d4daea; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 /* ── Info / success / warning / error banners ────────────── */
-[data-testid="stAlert"] {
-    border-radius: 8px;
-    border-left-width: 4px;
-}
-
-div[data-baseweb="notification"][kind="info"] {
-    background-color: #e8f0fb !important;
-    border-left-color: #4a7fc1 !important;
-    color: #1e3a5f !important;
-}
-
-div[data-baseweb="notification"][kind="success"] {
-    background-color: #e6f4ed !important;
-    border-left-color: #2e8b57 !important;
-    color: #1a3d2b !important;
-}
-
-div[data-baseweb="notification"][kind="warning"] {
-    background-color: #fdf4e3 !important;
-    border-left-color: #d4900a !important;
-    color: #5a3a00 !important;
-}
-
-div[data-baseweb="notification"][kind="error"] {
-    background-color: #fde8e8 !important;
-    border-left-color: #c0392b !important;
-    color: #5a1010 !important;
-}
-
+[data-testid="stAlert"] { border-radius: 8px; border-left-width: 4px; }
+div[data-baseweb="notification"][kind="info"] { background-color: #e8f0fb !important; border-left-color: #4a7fc1 !important; color: #1e3a5f !important; }
+div[data-baseweb="notification"][kind="success"] { background-color: #e6f4ed !important; border-left-color: #2e8b57 !important; color: #1a3d2b !important; }
+div[data-baseweb="notification"][kind="warning"] { background-color: #fdf4e3 !important; border-left-color: #d4900a !important; color: #5a3a00 !important; }
+div[data-baseweb="notification"][kind="error"] { background-color: #fde8e8 !important; border-left-color: #c0392b !important; color: #5a1010 !important; }
 /* ── Buttons ─────────────────────────────────────────────── */
-[data-testid="stFormSubmitButton"] button,
-.stButton > button {
-    background-color: #3a6fa8 !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 7px !important;
-    padding: 0.45rem 1.4rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em;
-    box-shadow: 0 2px 6px rgba(58,111,168,0.25) !important;
-    transition: background-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-[data-testid="stFormSubmitButton"] button:hover,
-.stButton > button:hover {
-    background-color: #2d5a8a !important;
-    box-shadow: 0 3px 10px rgba(45,90,138,0.35) !important;
-}
-
+[data-testid="stFormSubmitButton"] button, .stButton > button { background-color: #3a6fa8 !important; color: #ffffff !important; border: none !important; border-radius: 7px !important; padding: 0.45rem 1.4rem !important; font-weight: 600 !important; letter-spacing: 0.02em; box-shadow: 0 2px 6px rgba(58,111,168,0.25) !important; transition: background-color 0.18s ease, box-shadow 0.18s ease; }
+[data-testid="stFormSubmitButton"] button:hover, .stButton > button:hover { background-color: #2d5a8a !important; box-shadow: 0 3px 10px rgba(45,90,138,0.35) !important; }
 /* ── Text inputs ─────────────────────────────────────────── */
-[data-testid="stTextInput"] input {
-    background-color: #ffffff !important;
-    border: 1px solid #b8c8dc !important;
-    border-radius: 6px !important;
-    color: #1a2a3a !important;
-    padding: 0.35rem 0.6rem;
-    transition: border-color 0.15s;
-}
-
-[data-testid="stTextInput"] input:focus {
-    border-color: #4a7fc1 !important;
-    box-shadow: 0 0 0 3px rgba(74,127,193,0.15) !important;
-}
-
+[data-testid="stTextInput"] input { background-color: #ffffff !important; border: 1px solid #b8c8dc !important; border-radius: 6px !important; color: #1a2a3a !important; padding: 0.35rem 0.6rem; transition: border-color 0.15s; }
+[data-testid="stTextInput"] input:focus { border-color: #4a7fc1 !important; box-shadow: 0 0 0 3px rgba(74,127,193,0.15) !important; }
 /* ── File uploader ───────────────────────────────────────── */
-[data-testid="stFileUploader"] {
-    background-color: #ffffff !important;
-    border: 2px dashed #9ab3d0 !important;
-    border-radius: 10px !important;
-    padding: 1rem;
-}
-
-/* ── Code / pre blocks ───────────────────────────────────── */
-[data-testid="stCode"] pre {
-    background-color: #eef1f7 !important;
-    border: 1px solid #ccd5e0 !important;
-    border-radius: 8px !important;
-    color: #1e2d3e !important;
-    font-size: 0.82rem;
-}
-
+[data-testid="stFileUploader"] { background-color: #ffffff !important; border: 2px dashed #9ab3d0 !important; border-radius: 10px !important; padding: 1rem; }
 /* ── Plot containers ─────────────────────────────────────── */
-[data-testid="stImage"],
-.stPlotlyChart,
-canvas {
-    border-radius: 8px;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.07);
-}
-
+[data-testid="stImage"], .stPlotlyChart, canvas { border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
 /* ── Form container ──────────────────────────────────────── */
-[data-testid="stForm"] {
-    background-color: #ffffff;
-    border: 1px solid #d0daea;
-    border-radius: 12px;
-    padding: 1.2rem 1.4rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
+[data-testid="stForm"] { background-color: #ffffff; border: 1px solid #d0daea; border-radius: 12px; padding: 1.2rem 1.4rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("Food Nutrition: Analysis and Visualization")
 st.caption("Upload nutrients_data.csv • Pre-processing • EDA • Model Training • Evaluation and Visualizations • Predictions")
 
-
 def rmse_compat(y_true, y_pred):
     return float(np.sqrt(mean_squared_error(y_true, y_pred)))
 
-
 @st.cache_resource(show_spinner=False)
 def run_pipeline(file_bytes):
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     df = pd.read_csv(io.BytesIO(file_bytes))
     df.columns = [c.strip() for c in df.columns]
     raw_df = df.copy()
 
-    # -----------------------------
-    # Preprocessing / Cleaning
-    # -----------------------------
     df = df.replace("t", 0)
     df = df.replace("t'", 0)
     df = df.replace(",", "", regex=True)
@@ -286,9 +114,6 @@ def run_pipeline(file_bytes):
         else:
             df[col] = df[col].fillna(df[col].median())
 
-    # -----------------------------
-    # Feature Engineering
-    # -----------------------------
     eps = 1e-6
     if set(["Protein", "Fiber", "Calories"]).issubset(df.columns):
         df["nutrient_density"] = (df["Protein"] + df["Fiber"]) / (df["Calories"] + eps)
@@ -302,9 +127,6 @@ def run_pipeline(file_bytes):
 
     engineered_cols = [c for c in ["nutrient_density", "calories_per_gram", "protein_ratio", "fat_ratio", "carb_ratio"] if c in df.columns]
 
-    # -----------------------------
-    # ML Targets
-    # -----------------------------
     if "Calories" not in df.columns:
         raise ValueError("Calories column not found. Cannot build regression/classification targets.")
 
@@ -321,9 +143,6 @@ def run_pipeline(file_bytes):
 
     df["calorie_group"] = df["Calories"].apply(calorie_group)
 
-    # -----------------------------
-    # Prepare features (Encoding + Scaling)
-    # -----------------------------
     drop_cols_for_ml = []
     for c in ["Food", "Measure"]:
         if c in df.columns:
@@ -355,33 +174,18 @@ def run_pipeline(file_bytes):
     y_cls = y_cls_cat.cat.codes
     y_reg = df["Calories"].values
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y_cls, test_size=0.25, random_state=42, stratify=y_cls
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y_cls, test_size=0.25, random_state=42, stratify=y_cls)
 
     scaler = StandardScaler()
     scaler.fit(X_train)
     X_train_scaled = scaler.transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # -----------------------------
-    # Classification models
-    # -----------------------------
     models = {}
-    models["Random Forest"] = ("raw", RandomForestClassifier(
-        n_estimators=400, random_state=42, n_jobs=-1, class_weight="balanced"
-    ))
-    models["Logistic Regression"] = ("scaled", LogisticRegression(
-        max_iter=4000, class_weight="balanced", multi_class="ovr"
-    ))
-    models["Support Vector Machine"] = ("scaled", SVC(
-        kernel="rbf", C=2.0, gamma="scale", probability=True, class_weight="balanced"
-    ))
-    models["XGBoost"] = ("raw", XGBClassifier(
-        n_estimators=600, max_depth=5, learning_rate=0.05,
-        subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0,
-        random_state=42, eval_metric="mlogloss"
-    ))
+    models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=400, random_state=42, n_jobs=-1, class_weight="balanced"))
+    models["Logistic Regression"] = ("scaled", LogisticRegression(max_iter=4000, class_weight="balanced", multi_class="ovr"))
+    models["Support Vector Machine"] = ("scaled", SVC(kernel="rbf", C=2.0, gamma="scale", probability=True, class_weight="balanced"))
+    models["XGBoost"] = ("raw", XGBClassifier(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42, eval_metric="mlogloss"))
 
     results = []
     probs_for_roc = {}
@@ -410,9 +214,7 @@ def run_pipeline(file_bytes):
         probs_for_roc[name] = prob
         model_preds[name] = pred
 
-    results_df = pd.DataFrame(
-        results, columns=["Model", "Accuracy", "Precision(Macro)", "Recall(Macro)", "F1(Macro)", "ROC_AUC(OvR)"]
-    ).sort_values(by="F1(Macro)", ascending=False).reset_index(drop=True)
+    results_df = pd.DataFrame(results, columns=["Model", "Accuracy", "Precision(Macro)", "Recall(Macro)", "F1(Macro)", "ROC_AUC(OvR)"]).sort_values(by="F1(Macro)", ascending=False).reset_index(drop=True)
 
     best_model_name = results_df.loc[0, "Model"]
     best_mode, best_model = models[best_model_name]
@@ -425,18 +227,12 @@ def run_pipeline(file_bytes):
         best_pred = best_model.predict(X_test)
         best_prob = best_model.predict_proba(X_test)
 
-    # Feature importance
     rf_for_imp = models["Random Forest"][1]
     rf_for_imp.fit(X_train, y_train)
     imp = pd.Series(rf_for_imp.feature_importances_, index=X.columns).sort_values(ascending=False)
     top15_imp = imp.head(15)
 
-    # -----------------------------
-    # Regression models
-    # -----------------------------
-    Xr_train, Xr_test, yr_train, yr_test = train_test_split(
-        X, y_reg, test_size=0.25, random_state=42
-    )
+    Xr_train, Xr_test, yr_train, yr_test = train_test_split(X, y_reg, test_size=0.25, random_state=42)
 
     scaler_r = StandardScaler()
     scaler_r.fit(Xr_train)
@@ -447,10 +243,7 @@ def run_pipeline(file_bytes):
         "Linear Regression": ("scaled", LinearRegression()),
         "Random Forest Regressor": ("raw", RandomForestRegressor(n_estimators=400, random_state=42, n_jobs=-1)),
         "SVR": ("scaled", SVR(C=10.0, gamma="scale")),
-        "XGBoost Regressor": ("raw", XGBRegressor(
-            n_estimators=600, max_depth=5, learning_rate=0.05,
-            subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42
-        )),
+        "XGBoost Regressor": ("raw", XGBRegressor(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42)),
     }
 
     reg_results = []
@@ -477,31 +270,23 @@ def run_pipeline(file_bytes):
 
     reg_df = pd.DataFrame(reg_results, columns=["Model", "MAE", "RMSE", "R2"]).sort_values("RMSE").reset_index(drop=True)
 
-    # -----------------------------
-    # Clustering
-    # -----------------------------
     cluster_features = [c for c in ["Calories", "Protein", "Fat", "Carbs", "Fiber"] if c in df.columns]
     cluster_data = df[cluster_features].copy()
     cluster_scaler = StandardScaler()
     cluster_scaled = cluster_scaler.fit_transform(cluster_data)
-    k = 5
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    kmeans = KMeans(n_clusters=5, random_state=42, n_init=10)
     clusters = kmeans.fit_predict(cluster_scaled)
     df["cluster"] = clusters
 
     pca = PCA(n_components=2, random_state=42)
     xy = pca.fit_transform(cluster_scaled)
 
-    # -----------------------------
-    # Recommendation prep
-    # -----------------------------
     sim_features = cluster_features.copy()
     sim_mat = cosine_similarity(cluster_scaler.transform(df[sim_features]))
     food_to_index = {}
     if "Food" in df.columns:
         food_to_index = {str(f).strip(): i for i, f in enumerate(df["Food"].astype(str).tolist())}
 
-    # Healthy dashboard prep
     healthiest = pd.DataFrame()
     unhealthiest = pd.DataFrame()
     if "nutrient_density" in df.columns:
@@ -518,56 +303,22 @@ def run_pipeline(file_bytes):
         top_fat = df.sort_values("Fat", ascending=False)[["Food", "Category", "Fat"]].head(10)
 
     return {
-        "raw_df": raw_df,
-        "df": df,
-        "numeric_cols": numeric_cols,
-        "missing_report": missing_report,
-        "missing_nonzero": missing_nonzero,
-        "engineered_cols": engineered_cols,
-        "q1": q1,
-        "q2": q2,
-        "drop_cols_for_ml": drop_cols_for_ml,
-        "X": X,
-        "class_names": class_names,
-        "y_test": y_test,
-        "results_df": results_df,
-        "models": models,
-        "best_model_name": best_model_name,
-        "best_mode": best_mode,
-        "best_model": best_model,
-        "best_pred": best_pred,
-        "best_prob": best_prob,
-        "top15_imp": top15_imp,
-        "scaler": scaler,
-        "X_train": X_train,
-        "X_train_scaled": X_train_scaled,
-        "y_train": y_train,
-        "freq_maps": freq_maps,
-        "low_card": low_card,
-        "high_card": high_card,
-        "reg_models": reg_models,
-        "reg_df": reg_df,
-        "best_reg_name": best_reg_name,
-        "scaler_r": scaler_r,
-        "Xr_train": Xr_train,
-        "Xr_train_scaled": Xr_train_scaled,
-        "yr_train": yr_train,
-        "yr_test": yr_test,
-        "reg_predictions": reg_predictions,
-        "cluster_features": cluster_features,
-        "xy": xy,
-        "sim_mat": sim_mat,
-        "food_to_index": food_to_index,
-        "top_calorie": top_calorie,
-        "top_fat": top_fat,
-        "healthiest": healthiest,
-        "unhealthiest": unhealthiest
+        "raw_df": raw_df, "df": df, "numeric_cols": numeric_cols, "missing_report": missing_report,
+        "missing_nonzero": missing_nonzero, "engineered_cols": engineered_cols, "q1": q1, "q2": q2,
+        "drop_cols_for_ml": drop_cols_for_ml, "X": X, "class_names": class_names, "y_test": y_test,
+        "results_df": results_df, "models": models, "best_model_name": best_model_name,
+        "best_mode": best_mode, "best_model": best_model, "best_pred": best_pred, "best_prob": best_prob,
+        "top15_imp": top15_imp, "scaler": scaler, "X_train": X_train, "X_train_scaled": X_train_scaled,
+        "y_train": y_train, "freq_maps": freq_maps, "low_card": low_card, "high_card": high_card,
+        "reg_models": reg_models, "reg_df": reg_df, "best_reg_name": best_reg_name, "scaler_r": scaler_r,
+        "Xr_train": Xr_train, "Xr_train_scaled": Xr_train_scaled, "yr_train": yr_train, "yr_test": yr_test,
+        "reg_predictions": reg_predictions, "cluster_features": cluster_features, "xy": xy,
+        "sim_mat": sim_mat, "food_to_index": food_to_index, "top_calorie": top_calorie, "top_fat": top_fat,
+        "healthiest": healthiest, "unhealthiest": unhealthiest
     }
-
 
 def prepare_one_row(input_dict, ctx):
     one = pd.DataFrame([input_dict]).copy()
-
     one = one.replace("t", 0).replace("t'", 0)
     one = one.replace(",", "", regex=True)
 
@@ -609,17 +360,14 @@ def prepare_one_row(input_dict, ctx):
     one_enc = one_enc.replace([np.inf, -np.inf], np.nan).fillna(0)
     return one_enc
 
-
 def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
     if food_name not in food_to_index:
         return pd.DataFrame()
-
     i = food_to_index[food_name]
     sims = sim_mat[i].copy()
     sims[i] = -1
     cand_idx = np.argsort(sims)[::-1][:50]
     base_cal = df.loc[i, "Calories"]
-
     recs = df.loc[cand_idx, ["Food", "Category", "Calories"]].copy()
     recs["similarity"] = sims[cand_idx]
 
@@ -631,7 +379,6 @@ def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
         recs = recs[recs["Calories"] < base_cal].sort_values("similarity", ascending=False).head(top_n)
     return recs
 
-
 def render_data_info(df):
     st.subheader("Data Information")
     c1, c2 = st.columns(2)
@@ -641,7 +388,6 @@ def render_data_info(df):
     st.dataframe(df.head(), use_container_width=True)
     st.write("Column names:")
     st.write(list(df.columns))
-
 
 def render_preprocessing(ctx):
     st.subheader("Pre-processing")
@@ -656,15 +402,12 @@ def render_preprocessing(ctx):
         plt.close(fig)
     else:
         st.info("No missing values found.")
-
     st.write("Engineered columns added:", ctx["engineered_cols"])
     st.write("Calorie thresholds:", {"q1 (33%)": float(ctx["q1"]), "q2 (66%)": float(ctx["q2"])})
-
 
 def render_eda(ctx):
     st.subheader("EDA")
     df = ctx["df"]
-
     for col in [c for c in ["Calories", "Protein", "Fat", "Carbs"] if c in df.columns]:
         fig = plt.figure(figsize=(7, 4))
         sns.histplot(df[col], kde=True, bins=30)
@@ -723,17 +466,14 @@ def render_eda(ctx):
         st.pyplot(fig)
         plt.close(fig)
 
-
 def render_model_training(ctx):
     st.subheader("Model Training")
     st.markdown("#### Classification Model Comparison")
     st.dataframe(ctx["results_df"], use_container_width=True)
     st.write("Best classifier:", ctx["best_model_name"])
-
     st.markdown("#### Regression Model Comparison")
     st.dataframe(ctx["reg_df"], use_container_width=True)
     st.write("Best regressor:", ctx["best_reg_name"])
-
     fig = plt.figure(figsize=(5, 3))
     sns.countplot(x="calorie_group", data=ctx["df"], order=["Low", "Medium", "High"])
     plt.title("Calorie Group Distribution (Low/Medium/High)")
@@ -741,10 +481,8 @@ def render_model_training(ctx):
     st.pyplot(fig)
     plt.close(fig)
 
-
 def render_eval_visualizations(ctx):
     st.subheader("Evaluation and Visualizations")
-
     st.write("Confusion Matrix (Best Classifier):")
     st.dataframe(pd.DataFrame(confusion_matrix(ctx["y_test"], ctx["best_pred"])), use_container_width=True)
     st.code(classification_report(ctx["y_test"], ctx["best_pred"], target_names=ctx["class_names"]))
@@ -794,11 +532,9 @@ def render_eval_visualizations(ctx):
         st.pyplot(fig)
         plt.close(fig)
 
-
 def render_predictions(ctx):
     st.subheader("Predictions")
     st.write("Enter input values manually (no default values).")
-
     fields = [c for c in ["Category", "Grams", "Protein", "Fat", "Sat.Fat", "Fiber", "Carbs"] if c in ctx["raw_df"].columns or c == "Category"]
     user_input = {}
     with st.form("nutrition_prediction_form"):
@@ -831,7 +567,6 @@ def render_predictions(ctx):
         else:
             typed[k] = vv
 
-    # Calories for engineered features is unknown; use placeholder 0 for row prep
     typed.setdefault("Calories", 0.0)
     one_X = prepare_one_row(typed, ctx)
 
@@ -843,7 +578,6 @@ def render_predictions(ctx):
         best_reg_model.fit(ctx["Xr_train"], ctx["yr_train"])
         cal_pred = float(best_reg_model.predict(one_X)[0])
 
-    # Update Calories and rebuild row for classification
     typed["Calories"] = cal_pred
     one_X = prepare_one_row(typed, ctx)
 
@@ -868,15 +602,11 @@ def render_predictions(ctx):
             st.write(f"Healthier alternatives for: {rec_food}")
             st.dataframe(recs, use_container_width=True)
 
-
 with st.sidebar:
     st.header("Input")
     uploaded_file = st.file_uploader("Upload nutrients_data.csv", type=["csv"], accept_multiple_files=False)
     st.markdown("---")
-    module = st.radio(
-        "Modules",
-        ["Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"]
-    )
+    module = st.radio("Modules", ["Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"])
 
 if uploaded_file is None:
     st.info("Upload `nutrients_data.csv` from the left sidebar to continue.")
@@ -907,4 +637,3 @@ elif module == "Evaluation and Visualizations":
     render_eval_visualizations(ctx)
 elif module == "Predictions":
     render_predictions(ctx)
-
