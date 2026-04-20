@@ -634,7 +634,7 @@ if module == "Pre-processing":
 
 # 4. Only run the heavy ML pipeline if it's not already in memory
 if st.session_state.ctx is None:
-    with st.spinner("⚙️ Crunching data & training XGBoost/RF Models... (This should now be MUCH faster!)"):
+    with st.spinner(" Crunching data & training XGBoost/RF Models... "):
         try:
             st.session_state.ctx = run_pipeline(file_bytes)
         except Exception as ex:
