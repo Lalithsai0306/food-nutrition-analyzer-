@@ -6,11 +6,11 @@ import seaborn as sns
 # (Keep the rest of your imports here...)
 
 # 1. Page Title
-st.title("🍎 Food Nutrition Analysis & Prediction System")
+st.title("Food Nutrition Analysis & Prediction System")
 
 # 2. Load the Data FIRST
 csv_file = "nutrients_data.csv"
-df = pd.read_csv(csv_file)
+df = pd.read_csv("nutrients_data.csv")
 
 # Clean column names just like in your original script
 df.columns = [c.strip() for c in df.columns]
