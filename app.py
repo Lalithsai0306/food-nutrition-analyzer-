@@ -185,7 +185,8 @@ def run_pipeline(file_bytes):
     X_test_scaled = scaler.transform(X_test)
 
     models = {}
-    models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=400, random_state=42, n_jobs=-1, class_weight="balanced"))
+    # FIXED: n_jobs=1 to prevent cloud server freezing
+    models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=400, random_state=42, n_jobs=1, class_weight="balanced"))
     models["Logistic Regression"] = ("scaled", LogisticRegression(max_iter=4000, class_weight="balanced"))
     models["Support Vector Machine"] = ("scaled", SVC(kernel="rbf", C=2.0, gamma="scale", probability=True, class_weight="balanced"))
     models["XGBoost"] = ("raw", XGBClassifier(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42, eval_metric="mlogloss"))
@@ -244,7 +245,8 @@ def run_pipeline(file_bytes):
 
     reg_models = {
         "Linear Regression": ("scaled", LinearRegression()),
-        "Random Forest Regressor": ("raw", RandomForestRegressor(n_estimators=400, random_state=42, n_jobs=-1)),
+        # FIXED: n_jobs=1 to prevent cloud server freezing
+        "Random Forest Regressor": ("raw", RandomForestRegressor(n_estimators=400, random_state=42, n_jobs=1)),
         "SVR": ("scaled", SVR(C=10.0, gamma="scale")),
         "XGBoost Regressor": ("raw", XGBRegressor(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42)),
     }
