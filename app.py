@@ -1,6 +1,6 @@
 # ============================================================
 # Food Nutrition: Analysis and Visualization
-# Streamlit Version (Optimized for Speed)
+# Streamlit Version (Optimized for Speed + Fuzzy Match)
 # ============================================================
 
 import warnings
@@ -361,9 +361,20 @@ def prepare_one_row(input_dict, ctx):
     return one_enc
 
 def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
-    if food_name not in food_to_index:
-        return pd.DataFrame()
-    i = food_to_index[food_name]
+    # 1. Try an exact match first
+    if food_name in food_to_index:
+        target_food = food_name
+    else:
+        # 2. If no exact match, try a partial (case-insensitive) match
+        matches = df[df['Food'].astype(str).str.contains(food_name, case=False, na=False)]['Food'].tolist()
+        if not matches:
+            return pd.DataFrame(), None # Nothing found at all
+        
+        # Grab the first partial match we found
+        target_food = matches[0]
+
+    # Now proceed with the math using the target_food
+    i = food_to_index[target_food]
     sims = sim_mat[i].copy()
     sims[i] = -1
     cand_idx = np.argsort(sims)[::-1][:50]
@@ -377,7 +388,8 @@ def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
         recs = recs.sort_values(["nutrient_density", "similarity"], ascending=[False, False]).head(top_n)
     else:
         recs = recs[recs["Calories"] < base_cal].sort_values("similarity", ascending=False).head(top_n)
-    return recs
+        
+    return recs, target_food
 
 def render_data_info(df):
     st.subheader("Data Information")
@@ -596,11 +608,12 @@ def render_predictions(ctx):
     st.dataframe(pd.DataFrame({"Class": ctx["class_names"], "Probability": prob}), use_container_width=True)
 
     if rec_food.strip() and "Food" in ctx["df"].columns:
-        recs = recommend_healthier(ctx["df"], ctx["sim_mat"], ctx["food_to_index"], rec_food.strip(), top_n=5)
+        recs, matched_food = recommend_healthier(ctx["df"], ctx["sim_mat"], ctx["food_to_index"], rec_food.strip(), top_n=5)
+        
         if recs.empty:
-            st.warning("No healthier alternatives found (or food not found).")
+            st.warning(f"No healthier alternatives found (or no food containing '{rec_food}' was found).")
         else:
-            st.write(f"Healthier alternatives for: {rec_food}")
+            st.write(f"Healthier alternatives for: **{matched_food}**")
             st.dataframe(recs, use_container_width=True)
 
 with st.sidebar:
