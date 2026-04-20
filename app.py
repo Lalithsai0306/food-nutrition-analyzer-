@@ -108,11 +108,12 @@ def run_pipeline(file_bytes):
     missing_report = pd.DataFrame({"missing_count": missing_count, "missing_pct": missing_pct})
     missing_nonzero = missing_pct[missing_pct > 0]
 
+    # FIX 1: Safely handle missing values by explicitly checking for numeric types
     for col in df.columns:
-        if df[col].dtype == "object":
-            df[col] = df[col].fillna("Unknown")
-        else:
+        if pd.api.types.is_numeric_dtype(df[col]):
             df[col] = df[col].fillna(df[col].median())
+        else:
+            df[col] = df[col].fillna("Unknown")
 
     eps = 1e-6
     if set(["Protein", "Fiber", "Calories"]).issubset(df.columns):
@@ -149,7 +150,9 @@ def run_pipeline(file_bytes):
             drop_cols_for_ml.append(c)
 
     X_raw = df.drop(columns=["Calories", "calorie_group"] + drop_cols_for_ml).copy()
-    cat_cols = X_raw.select_dtypes(include=["object"]).columns.tolist()
+    
+    # FIX 2: Safely grab categorical columns by excluding numbers
+    cat_cols = X_raw.select_dtypes(exclude=[np.number]).columns.tolist()
 
     low_card = []
     high_card = []
@@ -326,11 +329,12 @@ def prepare_one_row(input_dict, ctx):
         if c in one.columns:
             one[c] = pd.to_numeric(one[c], errors="coerce")
 
+    # FIX 3: Safely handle missing values in individual prediction rows
     for col in one.columns:
-        if one[col].dtype == "object":
-            one[col] = one[col].fillna("Unknown")
-        else:
+        if pd.api.types.is_numeric_dtype(one[col]):
             one[col] = one[col].fillna(0)
+        else:
+            one[col] = one[col].fillna("Unknown")
 
     eps = 1e-6
     if set(["Protein", "Fiber", "Calories"]).issubset(one.columns):
