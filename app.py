@@ -1,8 +1,3 @@
-# ============================================================
-# Food Nutrition: Analysis and Visualization
-# Streamlit Version (Optimized for Speed + Fuzzy Match + Diverse Recs)
-# ============================================================
-
 import warnings
 warnings.filterwarnings("ignore")
 
