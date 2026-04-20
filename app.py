@@ -1,6 +1,6 @@
 # ============================================================
 # Food Nutrition: Analysis and Visualization
-# Streamlit Version (same logic, modular UI)
+# Streamlit Version (Optimized UI + Default Data)
 # ============================================================
 
 import warnings
@@ -32,52 +32,38 @@ from xgboost import XGBClassifier, XGBRegressor
 st.set_page_config(page_title="Food Nutrition: Analysis and Visualization", layout="wide")
 
 # ============================================================
-# Light Contrast Styling
+# Attractive Professional Styling (No Logos)
 # ============================================================
 st.markdown("""
 <style>
 /* ── Page background ─────────────────────────────────────── */
-[data-testid="stAppViewContainer"] { background-color: #f5f7fa; }
-[data-testid="stHeader"] { background-color: #f5f7fa; border-bottom: 1px solid #dde3ec; }
+[data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #f4f7f6 0%, #e8eef2 100%); }
+[data-testid="stHeader"] { background-color: transparent; }
 /* ── Sidebar ─────────────────────────────────────────────── */
-[data-testid="stSidebar"] { background-color: #eef1f7; border-right: 1px solid #d4daea; }
-[data-testid="stSidebar"] .stRadio label { color: #2d3a4a; font-weight: 500; }
-[data-testid="stSidebar"] hr { border-color: #c8d0df; }
-/* ── Main title & caption ────────────────────────────────── */
-h1 { color: #1a2a3a !important; letter-spacing: -0.5px; border-bottom: 2px solid #c5d0e0; padding-bottom: 0.4rem; margin-bottom: 0.5rem; }
-[data-testid="stCaptionContainer"] p { color: #5a6a7e !important; font-size: 0.88rem; }
-/* ── Section subheaders ──────────────────────────────────── */
-h2, h3 { color: #243447 !important; border-left: 4px solid #6b93c4; padding-left: 10px; margin-top: 1.4rem !important; }
+[data-testid="stSidebar"] { background-color: #1e2b3c !important; }
+[data-testid="stSidebar"] * { color: #f0f4f8 !important; }
+[data-testid="stSidebar"] hr { border-color: #3a4a5a; }
+/* ── Main title & section headers ────────────────────────── */
+h1 { color: #1e2b3c !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-weight: 700; border-bottom: 3px solid #3a6fa8; padding-bottom: 10px; margin-bottom: 20px; }
+h2, h3 { color: #2d5a8a !important; border-left: 5px solid #3a6fa8; padding-left: 10px; margin-top: 20px !important; }
 h4 { color: #344a60 !important; }
-/* ── Metric cards ────────────────────────────────────────── */
-[data-testid="stMetric"] { background: #ffffff; border: 1px solid #d0daea; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-[data-testid="stMetricLabel"] { color: #5a6a7e !important; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+/* ── Metric cards & Dataframes ───────────────────────────── */
+[data-testid="stMetric"], div.stDataFrame { background: #ffffff; border: 1px solid #d0daea; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+[data-testid="stMetricLabel"] { color: #5a6a7e !important; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
 [data-testid="stMetricValue"] { color: #1a2a3a !important; font-weight: 700; }
-/* ── Dataframes / tables ─────────────────────────────────── */
-[data-testid="stDataFrame"] { border: 1px solid #d4daea; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-/* ── Info / success / warning / error banners ────────────── */
-[data-testid="stAlert"] { border-radius: 8px; border-left-width: 4px; }
-div[data-baseweb="notification"][kind="info"] { background-color: #e8f0fb !important; border-left-color: #4a7fc1 !important; color: #1e3a5f !important; }
-div[data-baseweb="notification"][kind="success"] { background-color: #e6f4ed !important; border-left-color: #2e8b57 !important; color: #1a3d2b !important; }
-div[data-baseweb="notification"][kind="warning"] { background-color: #fdf4e3 !important; border-left-color: #d4900a !important; color: #5a3a00 !important; }
-div[data-baseweb="notification"][kind="error"] { background-color: #fde8e8 !important; border-left-color: #c0392b !important; color: #5a1010 !important; }
 /* ── Buttons ─────────────────────────────────────────────── */
-[data-testid="stFormSubmitButton"] button, .stButton > button { background-color: #3a6fa8 !important; color: #ffffff !important; border: none !important; border-radius: 7px !important; padding: 0.45rem 1.4rem !important; font-weight: 600 !important; letter-spacing: 0.02em; box-shadow: 0 2px 6px rgba(58,111,168,0.25) !important; transition: background-color 0.18s ease, box-shadow 0.18s ease; }
-[data-testid="stFormSubmitButton"] button:hover, .stButton > button:hover { background-color: #2d5a8a !important; box-shadow: 0 3px 10px rgba(45,90,138,0.35) !important; }
+[data-testid="stFormSubmitButton"] button, .stButton > button { background: linear-gradient(to right, #3a6fa8, #2d5a8a) !important; color: #ffffff !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 1.5rem !important; font-weight: 600 !important; width: 100%; transition: all 0.3s ease; }
+[data-testid="stFormSubmitButton"] button:hover, .stButton > button:hover { box-shadow: 0 5px 15px rgba(58,111,168,0.3) !important; transform: translateY(-2px); }
 /* ── Text inputs ─────────────────────────────────────────── */
-[data-testid="stTextInput"] input { background-color: #ffffff !important; border: 1px solid #b8c8dc !important; border-radius: 6px !important; color: #1a2a3a !important; padding: 0.35rem 0.6rem; transition: border-color 0.15s; }
+[data-testid="stTextInput"] input { background-color: #ffffff !important; border: 1px solid #b8c8dc !important; border-radius: 6px !important; color: #1a2a3a !important; padding: 0.4rem 0.6rem; }
 [data-testid="stTextInput"] input:focus { border-color: #4a7fc1 !important; box-shadow: 0 0 0 3px rgba(74,127,193,0.15) !important; }
-/* ── File uploader ───────────────────────────────────────── */
-[data-testid="stFileUploader"] { background-color: #ffffff !important; border: 2px dashed #9ab3d0 !important; border-radius: 10px !important; padding: 1rem; }
-/* ── Plot containers ─────────────────────────────────────── */
-[data-testid="stImage"], .stPlotlyChart, canvas { border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
 /* ── Form container ──────────────────────────────────────── */
-[data-testid="stForm"] { background-color: #ffffff; border: 1px solid #d0daea; border-radius: 12px; padding: 1.2rem 1.4rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+[data-testid="stForm"] { background-color: #ffffff; border: 1px solid #d0daea; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("Food Nutrition: Analysis and Visualization")
-st.caption("Upload nutrients_data.csv • Pre-processing • EDA • Model Training • Evaluation and Visualizations • Predictions")
+st.caption("Automated Nutritional Profiling • Machine Learning Predictions • Health Recommendations")
 
 def rmse_compat(y_true, y_pred):
     return float(np.sqrt(mean_squared_error(y_true, y_pred)))
@@ -608,52 +594,52 @@ def render_predictions(ctx):
             st.write(f"Healthier alternatives for: {rec_food}")
             st.dataframe(recs, use_container_width=True)
 
+# ==========================================
+# UI SIDEBAR & NAVIGATION
+# ==========================================
 with st.sidebar:
-    st.header("Input")
-    uploaded_file = st.file_uploader("Upload nutrients_data.csv", type=["csv"], accept_multiple_files=False)
+    st.markdown("### **System Menu**")
+    module = st.radio("Modules", ["Overview", "Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"])
     st.markdown("---")
-    module = st.radio("Modules", ["Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"])
+    uploaded_file = st.file_uploader("Upload custom nutrients_data.csv", type=["csv"], accept_multiple_files=False)
 
 # ==========================================
-# THE MAGIC: st.session_state optimization
+# DEFAULT DATA & SESSION STATE HANDLING
 # ==========================================
 
-if uploaded_file is None:
-    st.info("Upload `nutrients_data.csv` from the left sidebar to continue.")
-    st.stop()
+# 1. Determine Data Source
+if uploaded_file is not None:
+    file_bytes = uploaded_file.getvalue()
+    file_id = uploaded_file.name + str(uploaded_file.size)
+else:
+    try:
+        with open("nutrients_data.csv", "rb") as f:
+            file_bytes = f.read()
+        file_id = "default_system_dataset"
+    except FileNotFoundError:
+        st.error("Please upload nutrients_data.csv to continue.")
+        st.stop()
 
-# 1. Create a unique ID for the file to detect if the user uploads a new one
-file_id = uploaded_file.name + str(uploaded_file.size)
-
-# 2. If it's a new file, clear the old memory
+# 2. Memory check
 if "file_id" not in st.session_state or st.session_state.file_id != file_id:
     st.session_state.file_id = file_id
     st.session_state.ctx = None 
 
-# 3. Read the basic preview dataframe
-try:
-    file_bytes = uploaded_file.getvalue()
-    preview_df = pd.read_csv(io.BytesIO(file_bytes))
-except Exception as ex:
-    st.error(f"Could not read dataset: {ex}")
-    st.stop()
-
-render_data_info(preview_df)
-
-# 4. Only run the heavy ML pipeline if it's not already in memory
+# 3. ML Pipeline Execution (Only runs once)
 if st.session_state.ctx is None:
-    with st.spinner("⚙️ Crunching data & training XGBoost/RF Models... (This takes a few seconds, but only runs ONCE!)"):
+    with st.spinner("⚙️ Training models on dataset... (This runs once)"):
         try:
             st.session_state.ctx = run_pipeline(file_bytes)
         except Exception as ex:
             st.error(f"Pipeline failed: {ex}")
             st.stop()
 
-# 5. Instantly load the context from server RAM
 ctx = st.session_state.ctx
 
-# 6. Render the selected module
-if module == "Pre-processing":
+# 4. Render selected module
+if module == "Overview":
+    render_data_info(ctx["raw_df"])
+elif module == "Pre-processing":
     render_preprocessing(ctx)
 elif module == "EDA":
     render_eda(ctx)
