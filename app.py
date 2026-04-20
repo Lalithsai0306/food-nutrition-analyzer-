@@ -1,6 +1,6 @@
 # ============================================================
 # Food Nutrition: Analysis and Visualization
-# Streamlit Version (same logic, modular UI)
+# Streamlit Version (Optimized for Speed)
 # ============================================================
 
 import warnings
@@ -23,7 +23,6 @@ from sklearn.metrics import (
 )
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.svm import SVC, SVR
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
@@ -108,7 +107,6 @@ def run_pipeline(file_bytes):
     missing_report = pd.DataFrame({"missing_count": missing_count, "missing_pct": missing_pct})
     missing_nonzero = missing_pct[missing_pct > 0]
 
-    # Safely handle missing values by explicitly checking for numeric types
     for col in df.columns:
         if pd.api.types.is_numeric_dtype(df[col]):
             df[col] = df[col].fillna(df[col].median())
@@ -151,7 +149,6 @@ def run_pipeline(file_bytes):
 
     X_raw = df.drop(columns=["Calories", "calorie_group"] + drop_cols_for_ml).copy()
     
-    # Safely grab categorical columns by excluding numbers
     cat_cols = X_raw.select_dtypes(exclude=[np.number]).columns.tolist()
 
     low_card = []
@@ -184,12 +181,13 @@ def run_pipeline(file_bytes):
     X_train_scaled = scaler.transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
+    # ==========================================
+    # OPTIMIZED CLASSIFICATION MODELS
+    # ==========================================
     models = {}
-    # FIXED: n_jobs=1 to prevent cloud server freezing
-    models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=400, random_state=42, n_jobs=1, class_weight="balanced"))
-    models["Logistic Regression"] = ("scaled", LogisticRegression(max_iter=4000, class_weight="balanced"))
-    models["Support Vector Machine"] = ("scaled", SVC(kernel="rbf", C=2.0, gamma="scale", probability=True, class_weight="balanced"))
-    models["XGBoost"] = ("raw", XGBClassifier(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42, eval_metric="mlogloss"))
+    models["Random Forest"] = ("raw", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight="balanced"))
+    models["Logistic Regression"] = ("scaled", LogisticRegression(max_iter=1000, class_weight="balanced"))
+    models["XGBoost"] = ("raw", XGBClassifier(n_estimators=150, max_depth=5, learning_rate=0.1, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42, eval_metric="mlogloss"))
 
     results = []
     probs_for_roc = {}
@@ -220,19 +218,14 @@ def run_pipeline(file_bytes):
 
     results_df = pd.DataFrame(results, columns=["Model", "Accuracy", "Precision(Macro)", "Recall(Macro)", "F1(Macro)", "ROC_AUC(OvR)"]).sort_values(by="F1(Macro)", ascending=False).reset_index(drop=True)
 
+    # Get best classifier without retraining
     best_model_name = results_df.loc[0, "Model"]
     best_mode, best_model = models[best_model_name]
-    if best_mode == "scaled":
-        best_model.fit(X_train_scaled, y_train)
-        best_pred = best_model.predict(X_test_scaled)
-        best_prob = best_model.predict_proba(X_test_scaled)
-    else:
-        best_model.fit(X_train, y_train)
-        best_pred = best_model.predict(X_test)
-        best_prob = best_model.predict_proba(X_test)
+    best_pred = model_preds[best_model_name]
+    best_prob = probs_for_roc[best_model_name]
 
+    # Feature importances
     rf_for_imp = models["Random Forest"][1]
-    rf_for_imp.fit(X_train, y_train)
     imp = pd.Series(rf_for_imp.feature_importances_, index=X.columns).sort_values(ascending=False)
     top15_imp = imp.head(15)
 
@@ -243,12 +236,13 @@ def run_pipeline(file_bytes):
     Xr_train_scaled = scaler_r.transform(Xr_train)
     Xr_test_scaled = scaler_r.transform(Xr_test)
 
+    # ==========================================
+    # OPTIMIZED REGRESSION MODELS
+    # ==========================================
     reg_models = {
         "Linear Regression": ("scaled", LinearRegression()),
-        # FIXED: n_jobs=1 to prevent cloud server freezing
-        "Random Forest Regressor": ("raw", RandomForestRegressor(n_estimators=400, random_state=42, n_jobs=1)),
-        "SVR": ("scaled", SVR(C=10.0, gamma="scale")),
-        "XGBoost Regressor": ("raw", XGBRegressor(n_estimators=600, max_depth=5, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42)),
+        "Random Forest Regressor": ("raw", RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)),
+        "XGBoost Regressor": ("raw", XGBRegressor(n_estimators=150, max_depth=5, learning_rate=0.1, subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0, random_state=42)),
     }
 
     reg_results = []
@@ -331,7 +325,6 @@ def prepare_one_row(input_dict, ctx):
         if c in one.columns:
             one[c] = pd.to_numeric(one[c], errors="coerce")
 
-    # Safely handle missing values in individual prediction rows
     for col in one.columns:
         if pd.api.types.is_numeric_dtype(one[col]):
             one[col] = one[col].fillna(0)
@@ -576,23 +569,21 @@ def render_predictions(ctx):
     typed.setdefault("Calories", 0.0)
     one_X = prepare_one_row(typed, ctx)
 
+    # NO RETRAINING: directly use the already-fitted model from memory
     best_reg_mode, best_reg_model = ctx["reg_models"][ctx["best_reg_name"]]
     if best_reg_mode == "scaled":
-        best_reg_model.fit(ctx["Xr_train_scaled"], ctx["yr_train"])
         cal_pred = float(best_reg_model.predict(ctx["scaler_r"].transform(one_X))[0])
     else:
-        best_reg_model.fit(ctx["Xr_train"], ctx["yr_train"])
         cal_pred = float(best_reg_model.predict(one_X)[0])
 
     typed["Calories"] = cal_pred
     one_X = prepare_one_row(typed, ctx)
 
+    # NO RETRAINING: directly use the already-fitted model from memory
     if ctx["best_mode"] == "scaled":
-        ctx["best_model"].fit(ctx["X_train_scaled"], ctx["y_train"])
         prob = ctx["best_model"].predict_proba(ctx["scaler"].transform(one_X))[0]
         pred_code = int(ctx["best_model"].predict(ctx["scaler"].transform(one_X))[0])
     else:
-        ctx["best_model"].fit(ctx["X_train"], ctx["y_train"])
         prob = ctx["best_model"].predict_proba(one_X)[0]
         pred_code = int(ctx["best_model"].predict(one_X)[0])
 
@@ -638,11 +629,12 @@ except Exception as ex:
     st.error(f"Could not read dataset: {ex}")
     st.stop()
 
-render_data_info(preview_df)
+if module == "Pre-processing":
+    render_data_info(preview_df)
 
 # 4. Only run the heavy ML pipeline if it's not already in memory
 if st.session_state.ctx is None:
-    with st.spinner("⚙️ Crunching data & training XGBoost/RF Models... (This takes a few seconds, but only runs ONCE!)"):
+    with st.spinner("⚙️ Crunching data & training XGBoost/RF Models... (This should now be MUCH faster!)"):
         try:
             st.session_state.ctx = run_pipeline(file_bytes)
         except Exception as ex:
