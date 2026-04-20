@@ -381,14 +381,20 @@ def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
     # Grab a larger pool of candidates initially
     cand_idx = np.argsort(sims)[::-1][:100] 
     base_cal = df.loc[i, "Calories"]
-    recs = df.loc[cand_idx, ["Food", "Category", "Calories"]].copy()
+    
+    # === THE FIX === 
+    # Extract ALL the columns we need BEFORE we drop duplicates so the lengths always match
+    cols_to_grab = ["Food", "Category", "Calories"]
+    if "nutrient_density" in df.columns:
+        cols_to_grab.append("nutrient_density")
+        
+    recs = df.loc[cand_idx, cols_to_grab].copy()
     recs["similarity"] = sims[cand_idx]
 
     # Drop items that have the exact same similarity score and calories
     recs = recs.drop_duplicates(subset=["similarity", "Calories"])
 
     if "nutrient_density" in df.columns:
-        recs["nutrient_density"] = df.loc[cand_idx, "nutrient_density"].values
         recs = recs[recs["Calories"] < base_cal]
         recs = recs.sort_values(["nutrient_density", "similarity"], ascending=[False, False]).head(top_n)
     else:
