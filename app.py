@@ -1,6 +1,6 @@
 # ============================================================
 # Food Nutrition: Analysis and Visualization
-# Streamlit Version (Optimized for Speed + Fuzzy Match)
+# Streamlit Version (Optimized for Speed + Fuzzy Match + Diverse Recs)
 # ============================================================
 
 import warnings
@@ -377,10 +377,15 @@ def recommend_healthier(df, sim_mat, food_to_index, food_name, top_n=5):
     i = food_to_index[target_food]
     sims = sim_mat[i].copy()
     sims[i] = -1
-    cand_idx = np.argsort(sims)[::-1][:50]
+    
+    # Grab a larger pool of candidates initially
+    cand_idx = np.argsort(sims)[::-1][:100] 
     base_cal = df.loc[i, "Calories"]
     recs = df.loc[cand_idx, ["Food", "Category", "Calories"]].copy()
     recs["similarity"] = sims[cand_idx]
+
+    # Drop items that have the exact same similarity score and calories
+    recs = recs.drop_duplicates(subset=["similarity", "Calories"])
 
     if "nutrient_density" in df.columns:
         recs["nutrient_density"] = df.loc[cand_idx, "nutrient_density"].values
