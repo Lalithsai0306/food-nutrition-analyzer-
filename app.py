@@ -1,3 +1,8 @@
+# ============================================================
+# Food Nutrition: Analysis and Visualization
+# Streamlit Version (Optimized for Speed + Fuzzy Match + Demo Dataset)
+# ============================================================
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -624,20 +629,38 @@ def render_predictions(ctx):
 
 with st.sidebar:
     st.header("Input")
-    uploaded_file = st.file_uploader("Upload nutrients_data.csv", type=["csv"], accept_multiple_files=False)
+    
+    # ADDED: A checkbox to let users use the built-in dataset
+    use_demo = st.checkbox("Use Demo Dataset", value=True, help="Automatically loads the built-in dataset if no file is uploaded.")
+    
+    uploaded_file = st.file_uploader("Or upload your own nutrients_data.csv", type=["csv"], accept_multiple_files=False)
     st.markdown("---")
     module = st.radio("Modules", ["Pre-processing", "EDA", "Model Training", "Evaluation and Visualizations", "Predictions"])
 
 # ==========================================
-# THE MAGIC: st.session_state optimization
+# THE MAGIC: st.session_state optimization & File Handling
 # ==========================================
 
-if uploaded_file is None:
-    st.info("Upload `nutrients_data.csv` from the left sidebar to continue.")
-    st.stop()
+file_bytes = None
+file_id = ""
 
-# 1. Create a unique ID for the file to detect if the user uploads a new one
-file_id = uploaded_file.name + str(uploaded_file.size)
+if uploaded_file is not None:
+    # 1A. The user uploaded their own custom file
+    file_bytes = uploaded_file.getvalue()
+    file_id = uploaded_file.name + str(uploaded_file.size)
+elif use_demo:
+    # 1B. Fallback: Load the dataset directly from the project folder
+    try:
+        with open("nutrients_data.csv", "rb") as f:
+            file_bytes = f.read()
+        file_id = "demo_dataset_default"
+    except FileNotFoundError:
+        st.error("❌ The demo dataset (`nutrients_data.csv`) was not found in the application folder. Please upload it manually.")
+        st.stop()
+else:
+    # 1C. Nothing uploaded and demo is unchecked
+    st.info("👈 Please upload a dataset or check 'Use Demo Dataset' in the sidebar to continue.")
+    st.stop()
 
 # 2. If it's a new file, clear the old memory
 if "file_id" not in st.session_state or st.session_state.file_id != file_id:
@@ -646,14 +669,10 @@ if "file_id" not in st.session_state or st.session_state.file_id != file_id:
 
 # 3. Read the basic preview dataframe
 try:
-    file_bytes = uploaded_file.getvalue()
     preview_df = pd.read_csv(io.BytesIO(file_bytes))
 except Exception as ex:
     st.error(f"Could not read dataset: {ex}")
     st.stop()
-
-if module == "Pre-processing":
-    render_data_info(preview_df)
 
 # 4. Only run the heavy ML pipeline if it's not already in memory
 if st.session_state.ctx is None:
